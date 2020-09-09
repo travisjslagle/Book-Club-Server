@@ -53,7 +53,7 @@ router.put("/update/:entryId", validateSession, (req, res) => {
     releaseYear: req.body.book.releaseYear,
   };
 
-  const query = { where: { id: req.params.entryId, createdBy: req.user.id } };
+  const query = { where: { id: req.params.entryId } };
 
   Book.update(updateBook, query)
     .then((books) => res.status(200).json(books))

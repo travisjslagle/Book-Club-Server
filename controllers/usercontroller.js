@@ -1,60 +1,73 @@
-require('dotenv').config();
-const router = require('express').Router();
-const User = require('../db').import('../models/user');
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
+require("dotenv").config();
+const router = require("express").Router();
+const User = require("../db").import("../models/user");
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
 
 // USER SIGNUP
-router.post('/create', (req, res) => {
-    User.create({
-        username: req.body.user.username,
-        email: req.body.user.email,
-        password: bcrypt.hashSync(req.body.user.password, 13)   
+router.post("/create", (req, res) => {
+  User.create({
+    username: req.body.user.username,
+    email: req.body.user.email,
+    password: bcrypt.hashSync(req.body.user.password, 13),
+  })
+    .then(function createSuccess(user) {
+      let token = jwt.sign(
+        { id: user.id, username: user.username },
+        process.env.JWT_SECRET,
+        { expiresIn: 60 * 60 * 24 }
+      );
+
+      res.json({
+        user: user,
+        message: "User has been created!",
+        sessionToken: token,
+      });
     })
-    .then(
-        function createSuccess(user) {
-
-            let token = jwt.sign({id: user.id, username: user.username}, process.env.JWT_SECRET, {expiresIn: 60*60*24});
-
-            res.json({
-                user: user,
-                message: 'User has been created!',
-                sessionToken: token
-            });
-        }
-    )
-    .catch(err => res.status(500).json({error: err}))
+    .catch((err) => res.status(500).json({ error: err }));
 });
 
-
 // USER LOGIN
-router.post('/login', (req, res) => {
-    User.findOne({
-        where: {
-            username: req.body.user.username
-        }
-    })
+router.post("/login", (req, res) => {
+  User.findOne({
+    where: {
+      username: req.body.user.username,
+    },
+  })
     .then(function loginSuccess(user) {
-        if (user) {
+      if (user) {
+        bcrypt.compare(req.body.user.password, user.password, function (
+          err,
+          matches
+        ) {
+          if (matches) {
+            let token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, {
+              expiresIn: 60 * 60 * 24,
+            });
 
-            bcrypt.compare(req.body.user.password, user.password, function(err, matches) {
-                if(matches){
-                    let token = jwt.sign({id: user.id}, process.env.JWT_SECRET, {expiresIn: 60*60*24})
-
-                res.status(200).json({
-                    user: user,
-                    message: 'User has logged in!',
-                    sessionToken: token
-                })
-                } else {
-                    res.status(500).json({error: 'Username or Password is incorrect'})
-                }
-            })
-        } else {
-            res.status(500).json({error: 'User does not exist'})
-        }
+            res.status(200).json({
+              user: user,
+              message: "User has logged in!",
+              sessionToken: token,
+            });
+          } else {
+            res
+              .status(500)
+              .json({ error: "Username or Password is incorrect" });
+          }
+        });
+      } else {
+        res.status(500).json({ error: "User does not exist" });
+      }
     })
-    .catch(err => res.status(500).json({error: err}));
-})
+    .catch((err) => res.status(500).json({ error: err }));
+});
+
+// MAKE USER A MODERATOR
+router.patch("/mod/:id", (req, res) => {
+  User.update({ isModerator: true }, { where: { id: req.params.id } })
+    .then(() => res.status(200).json({ message: "User is now a moderator" }))
+    .catch((err) => res.status(500).json({ error: err }));
+});
 
 module.exports = router;
